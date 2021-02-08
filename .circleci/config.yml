@@ -58,10 +58,11 @@ jobs:
           go get ./...
           go build -a -o "/tmp/workspace/consul-template" \
             -ldflags "${LD_FLAGS}" -tags "${GOTAGS}"
+          cd /tmp/workspace && zip consul-template.zip consul-template
       - persist_to_workspace: 
           root: /tmp/workspace
           paths:
-            - consul-template
+            - consul-template.zip
       - save_cache:
           key: ct-modcache-v1-{{ checksum "consul-template/go.mod" }}
           paths:
@@ -76,4 +77,4 @@ jobs:
           at: /tmp/workspace
       - run: cat ./env.sh >> $BASH_ENV
       - run: |
-          ghr -t ${github_token} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete "${UPSTREAM_VERSION}-${CIRCLE_TAG}-tha" /tmp/workspace/consul-template
+          ghr -t ${github_token} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete "${UPSTREAM_VERSION}-${CIRCLE_TAG}-tha" /tmp/workspace/consul-template.zip
