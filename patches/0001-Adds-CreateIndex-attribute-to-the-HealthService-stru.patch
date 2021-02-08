@@ -1,0 +1,61 @@
+From c73d15d1d8bc9bbe4f6fc711b529040dd764fd24 Mon Sep 17 00:00:00 2001
+From: Tomasz Habiger <tomasz.habiger@gmail.com>
+Date: Mon, 8 Feb 2021 06:05:42 +0100
+Subject: [PATCH] Adds CreateIndex attribute to the HealthService struct
+
+---
+ dependency/health_service.go      | 10 ++++++----
+ dependency/health_service_test.go |  2 ++
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/dependency/health_service.go b/dependency/health_service.go
+index 94199253..ee1e0502 100644
+--- a/dependency/health_service.go
++++ b/dependency/health_service.go
+@@ -52,6 +52,7 @@ type HealthService struct {
+ 	Status              string
+ 	Port                int
+ 	Weights             api.AgentWeights
++	CreateIndex         uint64
+ }
+ 
+ // HealthServiceQuery is the representation of all a service query in Consul.
+@@ -188,10 +189,11 @@ func (d *HealthServiceQuery) Fetch(clients *ClientSet, opts *QueryOptions) (inte
+ 			Name:                entry.Service.Service,
+ 			Tags: ServiceTags(
+ 				deepCopyAndSortTags(entry.Service.Tags)),
+-			Status:  status,
+-			Checks:  entry.Checks,
+-			Port:    entry.Service.Port,
+-			Weights: entry.Service.Weights,
++			Status:      status,
++			Checks:      entry.Checks,
++			Port:        entry.Service.Port,
++			Weights:     entry.Service.Weights,
++			CreateIndex: entry.Service.CreateIndex,
+ 		})
+ 	}
+ 
+diff --git a/dependency/health_service_test.go b/dependency/health_service_test.go
+index 397a85d0..a55b589b 100644
+--- a/dependency/health_service_test.go
++++ b/dependency/health_service_test.go
+@@ -212,6 +212,7 @@ func TestHealthConnectServiceQuery_Fetch(t *testing.T) {
+ 			inst.Node, inst.NodeID = "", ""
+ 			inst.Checks = nil
+ 			inst.NodeTaggedAddresses = nil
++			inst.CreateIndex = 0
+ 
+ 			assert.Equal(t, tc.exp, act)
+ 		})
+@@ -338,6 +339,7 @@ func TestHealthServiceQuery_Fetch(t *testing.T) {
+ 					v.ServiceMeta = filterVersionMeta(v.ServiceMeta)
+ 					v.NodeTaggedAddresses = filterAddresses(
+ 						v.NodeTaggedAddresses)
++					v.CreateIndex = 0
+ 				}
+ 			}
+ 
+-- 
+2.30.0
+

@@ -1,0 +1,79 @@
+version: 2.1
+workflows:
+  build_and_publish:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: /.*/
+      - publish-github-release:
+          context: org
+          requires:
+            - build
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: /.*/
+
+jobs:
+  build:
+    environment:
+      CGO_ENABLED: "0"
+      GO111MODULE: "on"
+      LD_FLAGS: ""
+      GOTAGS: ""
+    docker:
+      - image: circleci/golang:latest
+    working_directory: /go/src/github.com/hashicorp/
+    steps:
+      - checkout
+      - run: cat ./env.sh >> $BASH_ENV
+      - run: |
+          git clone https://github.com/hashicorp/consul-template.git
+          cd consul-template
+            git config user.name ${GIT_AUTHOR_NAME}
+            git config user.email ${GIT_AUTHOR_EMAIL}
+            git checkout "v${UPSTREAM_VERSION}"
+            git checkout -b build_${CIRCLE_WORKFLOW_ID}
+            git am ../patches/*
+      - restore_cache:
+          keys:
+          - ct-modcache-v1-{{ checksum "consul-template/go.mod" }}
+      - run: |
+          curl -sLo consul.zip https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip
+          unzip consul.zip
+          sudo cp consul /usr/local/bin/
+      - run: |
+          curl -sLo vault.zip https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip
+          unzip vault.zip
+          sudo cp vault /usr/local/bin/
+      - run: |
+          cd consul-template && make test
+      - run: |
+          cd consul-template
+          mkdir -p /tmp/workspace
+          go get ./...
+          go build -a -o "/tmp/workspace/consul-template" \
+            -ldflags "${LD_FLAGS}" -tags "${GOTAGS}"
+      - persist_to_workspace: 
+          root: /tmp/workspace
+          paths:
+            - consul-template
+      - save_cache:
+          key: ct-modcache-v1-{{ checksum "consul-template/go.mod" }}
+          paths:
+          - /go/pkg/mod
+
+  publish-github-release:
+    docker:
+      - image: cibuilds/github:0.10
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: cat ./env.sh >> $BASH_ENV
+      - run: |
+          ghr -t ${github_token} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete "${UPSTREAM_VERSION}-${CIRCLE_TAG}-tha" /tmp/workspace/consul-template
